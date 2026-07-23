@@ -1,3 +1,5 @@
 kagglehub
 pandas
 requests
+gensim
+numpy
