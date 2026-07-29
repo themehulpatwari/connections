@@ -11,6 +11,8 @@ from pathlib import Path
 
 import pandas as pd
 
+from miss_distance import miss_distance, miss_distance_distribution
+
 DATA_FILE = Path(__file__).parent / "data" / "Connections_Data.csv"
 RESULTS_DIR = Path(__file__).parent / "results"
 
@@ -63,21 +65,27 @@ def evaluate(name, solve, puzzles):
     color_hits = {color: 0 for color in COLORS}
     wins = 0
     per_puzzle = []
+    per_puzzle_missed = []
     for puzzle in puzzles:
-        solved = solved_colors(solve(puzzle["words"]), puzzle["answer"])
+        guess = solve(puzzle["words"])
+        solved = solved_colors(guess, puzzle["answer"])
         for color in solved:
             color_hits[color] += 1
         if len(solved) == 4:
             wins += 1
+        missed = miss_distance(guess, puzzle["answer"], COLORS)
+        per_puzzle_missed.append(missed)
         per_puzzle.append({
             "game_id": puzzle["game_id"],
             "date": puzzle["date"],
             "solved_colors": sorted(solved, key=COLORS.index),
+            "miss_distance": missed,
         })
 
     n = len(puzzles)
     total_hits = sum(color_hits.values())
     grouping_accuracy = total_hits / (n * 4)
+    miss_dist = miss_distance_distribution(per_puzzle_missed, COLORS)
 
     print(f"puzzles:           {n}")
     print(f"grouping accuracy: {grouping_accuracy:.3f}  ({total_hits}/{n * 4} groups)")
@@ -85,12 +93,20 @@ def evaluate(name, solve, puzzles):
     for color in COLORS:
         print(f"  {color:<8} {color_hits[color] / n:.3f}")
     print(f"win rate:          {wins / n:.3f}")
+    print("miss distance (0 = solved exactly):")
+    for color in COLORS:
+        counts = miss_dist[color]
+        print(
+            f"  {color:<8} "
+            + " ".join(f"{k}:{counts[k]}" for k in range(5))
+        )
 
     summary = {
         "puzzles": n,
         "grouping_accuracy": grouping_accuracy,
         "color_accuracy": {color: color_hits[color] / n for color in COLORS},
         "win_rate": wins / n,
+        "miss_distance_distribution": miss_dist,
     }
 
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
