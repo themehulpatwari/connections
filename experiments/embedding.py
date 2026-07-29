@@ -5,6 +5,7 @@
 
 import itertools
 import json
+import os
 import sys
 import time
 from pathlib import Path
@@ -140,7 +141,10 @@ def cosine_similarity_matrix(vectors, words=None, model=None):
     return unit @ unit.T
 
 
-_R_CACHE_FILE = DATA_DIR / "csls_cache.json"
+_CSLS_CACHE_TAG = os.environ.get("SWEEP_TAG")
+_R_CACHE_FILE = DATA_DIR / (
+    f"csls_cache-{_CSLS_CACHE_TAG}.json" if _CSLS_CACHE_TAG else "csls_cache.json"
+)
 _r_cache = None
 
 
@@ -303,7 +307,7 @@ def load_glove_840b():
 
 # --- active configuration: change these lines to swap behavior ---------------
 MODEL = load_glove                    # load_word2vec | load_fasttext | load_glove | load_glove_840b
-PREPROCESS = raw                       # raw | l2_normalize | mean_center | all_but_top_k
+PREPROCESS = all_but_top_k                       # raw | l2_normalize | mean_center | all_but_top_k
 SIMILARITY = cosine_similarity_matrix  # cosine_similarity_matrix | csls_similarity_matrix
 OBJECTIVE = sum_pairwise_score         # sum_pairwise_score | min_pairwise_score | centroid_score
 
@@ -417,12 +421,18 @@ if __name__ == "__main__":
 
     clean = [p for p, r in zip(puzzles, records) if not r["has_oov"]]
 
+    # Optional suffix so concurrent sweep runs (same second, same default
+    # names) don't clobber each other's result files. Unset in normal use.
+    tag = os.environ.get("SWEEP_TAG")
+    name = f"embedding-{tag}" if tag else "embedding"
+    name_no_oov = f"embedding_no_oov-{tag}" if tag else "embedding_no_oov"
+
     print("=== all puzzles ===")
-    evaluate("embedding", cached_solve, puzzles)
+    evaluate(name, cached_solve, puzzles)
     print(f"\n=== has_oov=False subset ({len(clean)}/{len(puzzles)}) ===")
-    evaluate("embedding_no_oov", cached_solve, clean)
+    evaluate(name_no_oov, cached_solve, clean)
 
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-    detail_file = RESULTS_DIR / f"embedding-detail-{stamp}.json"
+    detail_file = RESULTS_DIR / f"{name}-detail-{stamp}.json"
     detail_file.write_text(json.dumps({"config": CONFIG, "puzzles": records}, indent=2))
     print(f"\nSaved per-puzzle detail to {detail_file}")
