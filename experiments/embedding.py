@@ -352,17 +352,37 @@ PARTITION_IDX = np.array(
 )
 
 
-def search(data, group_score_fn):
-    """Exact argmax partition, as a tuple of 4 sorted-index tuples.
+def truth_partition_row(words, answer):
+    """Row of PARTITION_IDX holding the ground-truth partition, for oracle_rank."""
+    position = {word: i for i, word in enumerate(words)}
+    ids = sorted(_GROUP_ID[tuple(sorted(position[w] for w in group))] for group in answer)
+    return int(np.flatnonzero((PARTITION_IDX == ids).all(axis=1))[0])
+
+
+def search(data, group_score_fn, truth=None):
+    """Exact argmax partition (4 sorted-index tuples), plus — when `truth` is a
+    PARTITION_IDX row — how many partitions outscore the true one.
 
     Requires a group-additive objective — a group's score can't depend on the
     other 3 groups in its partition. Score all 1,820 groups once, then get all
-    2.6M partition scores via one vectorized index-and-sum.
+    2.6M partition scores via one vectorized index-and-sum. `truth` is measurement
+    only: the returned partition is argmax(scores) and cannot depend on it.
     """
     group_score = np.array([group_score_fn(data, g) for g in GROUPS])
-    best = np.argmax(group_score[PARTITION_IDX].sum(axis=1))
+    scores = group_score[PARTITION_IDX].sum(axis=1)
+    best = int(np.argmax(scores))
     partition = tuple(GROUPS[i] for i in PARTITION_IDX[best])
-    return partition, float(group_score[PARTITION_IDX[best]].sum())
+
+    diagnostics = {}
+    if truth is not None:
+        # Read truth's score out of `scores` (not a re-sum) so the tie test
+        # compares bit-identical floats.
+        truth_score = scores[truth]
+        diagnostics = {
+            "oracle_rank": int((scores > truth_score).sum()) + 1,
+            "n_tied": int((scores == truth_score).sum()) - 1,
+        }
+    return partition, float(scores[best]), diagnostics
 
 
 # --- solver ----------------------------------------------------------------
@@ -377,8 +397,13 @@ def _load_model():
     return _KV
 
 
-def solve_detailed(words):
-    """Solve one puzzle and return the full per-puzzle record from the spec."""
+def solve_detailed(words, answer=None):
+    """Solve one puzzle and return the full per-puzzle record from the spec.
+
+    When `answer` (the ground-truth grouping) is passed, also report oracle_rank /
+    n_tied — where the true partition ranks among all 2,627,625. Diagnostic only;
+    the returned partition is the argmax and never depends on it.
+    """
     kv = _load_model()
     start = time.perf_counter()
 
@@ -388,7 +413,8 @@ def solve_detailed(words):
 
     vectors = PREPROCESS(vectors, kv)
     data = vectors if OBJECTIVE is centroid_score else SIMILARITY(vectors, words, kv)
-    partition, best_score = search(data, OBJECTIVE)
+    truth = truth_partition_row(words, answer) if answer is not None else None
+    partition, best_score, diagnostics = search(data, OBJECTIVE, truth)
     groups = [[words[i] for i in g] for g in partition]
 
     return {
@@ -397,6 +423,7 @@ def solve_detailed(words):
         "oov_words": oov,
         "has_oov": bool(oov),
         "lookup_tiers": dict(zip(words, tiers)),
+        **diagnostics,
         "runtime_sec": time.perf_counter() - start,
         **CONFIG,
     }
@@ -413,8 +440,10 @@ if __name__ == "__main__":
     puzzles = load_puzzles()
 
     # Solve each puzzle once, keeping the full detail record. evaluate() re-calls
-    # solve(words), so cache groups on the words tuple to avoid re-solving.
-    records = [{"game_id": p["game_id"], "date": p["date"], **solve_detailed(p["words"])}
+    # solve(words), so cache groups on the words tuple to avoid re-solving. Passing
+    # the answer turns on oracle_rank (diagnostic only — see solve_detailed).
+    records = [{"game_id": p["game_id"], "date": p["date"],
+                **solve_detailed(p["words"], p["answer"])}
                for p in puzzles]
     cache = {tuple(p["words"]): r["predicted_groups"] for p, r in zip(puzzles, records)}
     cached_solve = lambda words: cache[tuple(words)]
@@ -429,10 +458,23 @@ if __name__ == "__main__":
 
     print("=== all puzzles ===")
     evaluate(name, cached_solve, puzzles)
+
+    # oracle_rank: where the true partition ranks among all 2,627,625 (all puzzles).
+    ranks = np.array([r["oracle_rank"] for r in records])
+    q1, med, q3 = np.percentile(ranks, [25, 50, 75])
+    oracle_summary = {
+        "median": float(med), "q1": float(q1), "q3": float(q3),
+        "rank_1": float((ranks == 1).mean()), "top_100": float((ranks <= 100).mean()),
+    }
+    print("oracle rank (truth's rank among 2,627,625 partitions):")
+    print(f"  median {med:.0f}  (q1 {q1:.0f}, q3 {q3:.0f})")
+    print(f"  rank-1 {oracle_summary['rank_1']:.3f}   top-100 {oracle_summary['top_100']:.3f}")
+
     print(f"\n=== has_oov=False subset ({len(clean)}/{len(puzzles)}) ===")
     evaluate(name_no_oov, cached_solve, clean)
 
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     detail_file = RESULTS_DIR / f"{name}-detail-{stamp}.json"
-    detail_file.write_text(json.dumps({"config": CONFIG, "puzzles": records}, indent=2))
+    detail_file.write_text(json.dumps(
+        {"config": CONFIG, "oracle_rank": oracle_summary, "puzzles": records}, indent=2))
     print(f"\nSaved per-puzzle detail to {detail_file}")
