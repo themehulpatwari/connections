@@ -234,7 +234,8 @@ def centroid_score(vectors, group):
 
 # --- model -------------------------------------------------------------------
 # () -> KeyedVectors. Each downloads and caches on first use. FREQ_BAND above
-# assumes vectors are frequency-sorted, true of all three of these sources.
+# assumes vectors are frequency-sorted (true of word2vec/fastText/GloVe);
+# Numberbatch is term-sorted instead — see load_numberbatch's note.
 
 def load_word2vec():
     import kagglehub
@@ -305,9 +306,33 @@ def load_glove_840b():
     return kv
 
 
+def load_numberbatch():
+    """ConceptNet Numberbatch, English 19.08 — plain lowercase terms (underscores
+    for multiword) in word2vec text format, downloaded from ConceptNet's S3 and
+    cached in data/. gensim-data ships only the ~1.9M-term *multilingual* build,
+    whose /c/{lang}/ term prefixes would miss every embed() lookup, so we fetch the
+    English-only file instead. gensim reads the .gz directly (no separate unzip).
+
+    Sorted by term, not frequency, so FREQ_BAND takes an ASCII-ordered slice rather
+    than the most-frequent words. Fine for all_but_top_k (its top principal
+    directions are a global property, stable across any large sample); only CSLS's
+    neighbor pool would be affected, and the settled config uses cosine.
+    """
+    import urllib.request
+    from gensim.models import KeyedVectors
+
+    url = "https://conceptnet.s3.amazonaws.com/downloads/2019/numberbatch/numberbatch-en-19.08.txt.gz"
+    gz_path = DATA_DIR / "numberbatch-en-19.08.txt.gz"
+    if not gz_path.exists():
+        DATA_DIR.mkdir(parents=True, exist_ok=True)
+        print(f"Downloading Numberbatch (~280MB) to {gz_path} ...")
+        urllib.request.urlretrieve(url, gz_path)
+    return KeyedVectors.load_word2vec_format(str(gz_path))
+
+
 # --- active configuration: change these lines to swap behavior ---------------
-MODEL = load_glove                    # load_word2vec | load_fasttext | load_glove | load_glove_840b
-PREPROCESS = all_but_top_k                       # raw | l2_normalize | mean_center | all_but_top_k
+MODEL = load_numberbatch                    # load_word2vec | load_fasttext | load_glove | load_glove_840b | load_numberbatch
+PREPROCESS = raw                       # raw | l2_normalize | mean_center | all_but_top_k
 SIMILARITY = cosine_similarity_matrix  # cosine_similarity_matrix | csls_similarity_matrix
 OBJECTIVE = sum_pairwise_score         # sum_pairwise_score | min_pairwise_score | centroid_score
 

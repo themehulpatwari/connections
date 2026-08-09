@@ -72,7 +72,6 @@ PRESETS = {
     "qwen_8b_shared_context": Config(embedding="Qwen/Qwen3-Embedding-8B", input_format="shared_context", n_permutations=1),
     "jina_bare": Config(embedding="jinaai/jina-embeddings-v5-text-small", task="clustering"),
     "mpnet_bare": Config(embedding="sentence-transformers/all-mpnet-base-v2"),
-    "gemini_bare": Config(embedding="gemini-embedding-001"),
     "mpnet_shared_context": Config(embedding="sentence-transformers/all-mpnet-base-v2", input_format="shared_context", n_permutations=8),
 }
 
