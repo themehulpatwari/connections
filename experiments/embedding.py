@@ -330,8 +330,44 @@ def load_numberbatch():
     return KeyedVectors.load_word2vec_format(str(gz_path))
 
 
+class _Model2VecKV:
+    """Adapts a model2vec StaticModel to the slice of the KeyedVectors surface the
+    pipeline touches: vector_size, `in`, [], and .vectors.
+
+    StaticModel is a distilled static embedder — encode() tokenizes a string, looks
+    up per-(sub)token vectors and pools them — so it resolves any word or phrase
+    itself and never OOVs. Hence __contains__ is always True and every lookup goes
+    straight through encode(); embed()'s three-case/underscore/average fallbacks
+    collapse to a single exact-tier hit, and has_oov is always False. .vectors is the
+    raw token-embedding matrix, used by mean_center / CSLS as the "vocabulary" pool.
+
+    Note the token vocab is small (~29.5k for potion-base-8M), so all_but_top_k's
+    PCA (PCA_SAMPLE_SIZE=100k) can't sample it without replacement — pair this model
+    with raw / l2_normalize / mean_center, not all_but_top_k, unless you shrink the
+    sample. encode() already L2-normalizes rows, so raw and l2_normalize coincide.
+    """
+
+    def __init__(self, model):
+        self.model = model
+        self.vectors = np.asarray(model.embedding, dtype=np.float32)
+        self.vector_size = self.vectors.shape[1]
+
+    def __contains__(self, token):
+        return True  # encode() resolves every string; nothing is OOV
+
+    def __getitem__(self, token):
+        # Phrases arrive underscore-joined from embed()'s phrase path; encode wants
+        # the natural spaced form.
+        return self.model.encode([token.replace("_", " ")])[0]
+
+
+def load_potion():
+    from model2vec import StaticModel
+    return _Model2VecKV(StaticModel.from_pretrained("minishlab/potion-base-8M"))
+
+
 # --- active configuration: change these lines to swap behavior ---------------
-MODEL = load_numberbatch                    # load_word2vec | load_fasttext | load_glove | load_glove_840b | load_numberbatch
+MODEL = load_potion                    # load_word2vec | load_fasttext | load_glove | load_glove_840b | load_numberbatch | load_potion
 PREPROCESS = raw                       # raw | l2_normalize | mean_center | all_but_top_k
 SIMILARITY = cosine_similarity_matrix  # cosine_similarity_matrix | csls_similarity_matrix
 OBJECTIVE = sum_pairwise_score         # sum_pairwise_score | min_pairwise_score | centroid_score
