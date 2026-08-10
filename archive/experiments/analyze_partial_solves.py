@@ -8,7 +8,7 @@ import json
 import sys
 from pathlib import Path
 
-ROOT = Path(__file__).parent.parent
+ROOT = Path(__file__).parent.parent.parent  # repo root (this file lives in archive/experiments/)
 sys.path.insert(0, str(ROOT))
 
 from connections import COLORS, load_puzzles, solved_colors  # noqa: E402

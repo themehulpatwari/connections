@@ -21,7 +21,7 @@ from pathlib import Path
 
 import numpy as np
 
-sys.path.append(str(Path(__file__).parent.parent))
+sys.path.append(str(Path(__file__).parent.parent.parent))  # repo root (this file lives in archive/experiments/)
 from connections import RESULTS_DIR, evaluate, load_puzzles
 from embedding import (GROUPS, PARTITION_IDX, centroid_score, min_pairwise_score,
                        sum_pairwise_score)
@@ -288,7 +288,7 @@ def search(data, group_score_fn, truth=None):
 # plain config field, loaded but never branched on, so a Phase 2 model swap is a
 # one-field edit. No OOV concept — subword tokenization always yields a vector.
 
-CACHE_DIR = Path(__file__).parent.parent / "data" / "sentence_cache"
+CACHE_DIR = Path(__file__).parent.parent.parent / "data" / "sentence_cache"
 
 _ST_CACHE = {}
 _HF_CACHE = {}

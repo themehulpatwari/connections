@@ -20,8 +20,8 @@ import sys
 import tempfile
 from pathlib import Path
 
-ROOT = Path(__file__).parent.parent
-EMB_FILE = ROOT / "experiments" / "embedding.py"
+ROOT = Path(__file__).parent.parent.parent  # repo root (this file lives in archive/experiments/)
+EMB_FILE = Path(__file__).parent / "embedding.py"  # the archived embedding.py beside this file
 RESULT_MD = ROOT / "results" / "result.md"
 PYTHON = ROOT / "venv" / "bin" / "python3"
 

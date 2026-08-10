@@ -16,15 +16,19 @@ python data.py            # download + build data/Connections_Data.csv
 
 ## Run an experiment
 
+The current solver is the ConceptNet Numberbatch baseline (raw vectors, cosine
+similarity, sum-of-pairwise-similarity score, exact brute-force search):
+
 ```bash
-python experiments/random_baseline.py   # shuffle baseline (the floor)
-python experiments/embedding.py     # (todo)
-python experiments/llm_zeroshot.py  # (todo)
-python experiments/llm_cot.py       # (todo)
+venv/bin/python experiments/numberbatch.py
 ```
 
-Each prints grouping accuracy — the fraction of groups it got exactly right —
-across the dataset.
+It prints grouping accuracy — the fraction of groups it got exactly right —
+across the dataset, plus win rate and the oracle rank of the true partition.
+
+Earlier exploratory work (the swappable embedding/sentence-embedding sweeps, the
+GloVe/fastText/word2vec loaders, and the analysis scripts) lives in `archive/`
+and still runs in place, e.g. `venv/bin/python archive/experiments/embedding.py`.
 
 ## Add your own
 

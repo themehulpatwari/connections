@@ -12,12 +12,17 @@ from pathlib import Path
 
 import numpy as np
 
-sys.path.append(str(Path(__file__).parent.parent))
+# Repo root = the ancestor dir that holds connections.py. Walking up (rather than a
+# fixed number of ..) keeps this correct both when run in place under
+# archive/experiments/ and when run_glove_sweep.py copies this file into a temp
+# workdir with connections.py/data/results symlinked beside it.
+_ROOT = next(p for p in Path(__file__).resolve().parents if (p / "connections.py").exists())
+sys.path.append(str(_ROOT))
 from connections import RESULTS_DIR, evaluate, load_puzzles
 
 STOPWORDS = {"a", "an", "the", "of", "in", "on", "at", "to", "and", "or", "for"}
 
-DATA_DIR = Path(__file__).parent.parent / "data"
+DATA_DIR = _ROOT / "data"
 
 # Both all_but_top_k's PCA and CSLS's neighbor search draw from this same pool:
 # the top FREQ_BAND most-frequent words (GoogleNews vectors are frequency-
@@ -367,7 +372,7 @@ def load_potion():
 
 
 # --- active configuration: change these lines to swap behavior ---------------
-MODEL = load_potion                    # load_word2vec | load_fasttext | load_glove | load_glove_840b | load_numberbatch | load_potion
+MODEL = load_numberbatch                    # load_word2vec | load_fasttext | load_glove | load_glove_840b | load_numberbatch | load_potion
 PREPROCESS = raw                       # raw | l2_normalize | mean_center | all_but_top_k
 SIMILARITY = cosine_similarity_matrix  # cosine_similarity_matrix | csls_similarity_matrix
 OBJECTIVE = sum_pairwise_score         # sum_pairwise_score | min_pairwise_score | centroid_score
