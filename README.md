@@ -34,3 +34,7 @@ and still runs in place, e.g. `venv/bin/python archive/experiments/embedding.py`
 
 Copy any file in `experiments/`, write a `solve(words)` that returns four groups
 of four words, and run it. Nothing else needs to change.
+
+## Acknowledgments
+Base puzzle data from Eric Nunes's [NYT Connections Kaggle dataset](https://www.kaggle.com/datasets/eric27n/the-new-york-times-connections).
+The use of ConceptNet Numberbatch was inspired by Eric's massAI Connections project.
